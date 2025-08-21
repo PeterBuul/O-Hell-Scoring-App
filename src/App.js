@@ -1,0 +1,270 @@
+import React, { useState, useMemo } from 'react';
+
+// --- Helper Components ---
+
+// Icon for a checkmark
+const CheckIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+  </svg>
+);
+
+// Icon for a cross
+const XIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+  </svg>
+);
+
+// --- Main Application Component ---
+
+const App = () => {
+  // --- State Management ---
+
+  const [players, setPlayers] = useState(Array(6).fill(''));
+  const [scores, setScores] = useState(Array(6).fill(null).map(() => []));
+  const [bids, setBids] = useState(Array(6).fill(0));
+  const [currentRound, setCurrentRound] = useState(1);
+  const [isGameOver, setIsGameOver] = useState(false);
+  // New state for setting the number of starting cards (sets)
+  const [startingCards, setStartingCards] = useState(12);
+
+  // --- Game Logic ---
+
+  /**
+   * Dynamically generates the sequence of card counts for each round.
+   * The sequence goes from the starting number down to 1, then from 1 back up to the starting number.
+   * useMemo ensures this complex calculation only runs when `startingCards` changes.
+   */
+  const roundsSequence = useMemo(() => {
+    const start = Number(startingCards);
+    if (isNaN(start) || start < 8 || start > 15) return []; // Basic validation
+
+    const down = Array.from({ length: start }, (_, i) => start - i); // e.g., [12, 11, ..., 1]
+    const up = Array.from({ length: start }, (_, i) => i + 1);       // e.g., [1, 2, ..., 12]
+    
+    return [...down, ...up];
+  }, [startingCards]);
+
+  const totalRounds = roundsSequence.length;
+  const cardsInRound = roundsSequence[currentRound - 1];
+  const isSetupLocked = currentRound > 1;
+
+  // --- Event Handlers ---
+
+  const handlePlayerNameChange = (index, name) => {
+    const newPlayers = [...players];
+    newPlayers[index] = name;
+    setPlayers(newPlayers);
+  };
+
+  const handleBidChange = (index, bid) => {
+    const newBids = [...bids];
+    newBids[index] = Math.max(0, parseInt(bid, 10) || 0);
+    setBids(newBids);
+  };
+
+  const recordRoundResult = (playerIndex, madeBid) => {
+    if (isGameOver) return;
+
+    const newScores = scores.map(s => [...s]);
+    const currentBid = bids[playerIndex];
+    let roundScore = 0;
+
+    if (madeBid) {
+      roundScore = 10 + currentBid;
+    }
+
+    if (newScores[playerIndex].length < currentRound) {
+        newScores[playerIndex][currentRound - 1] = roundScore;
+        setScores(newScores);
+    }
+  };
+
+  const handleNextRound = () => {
+    if (currentRound < totalRounds) {
+      setCurrentRound(prev => prev + 1);
+      setBids(Array(6).fill(0));
+    } else {
+      setIsGameOver(true);
+    }
+  };
+
+  const handleNewGame = () => {
+    setPlayers(Array(6).fill(''));
+    setScores(Array(6).fill(null).map(() => []));
+    setBids(Array(6).fill(0));
+    setCurrentRound(1);
+    setIsGameOver(false);
+    setStartingCards(12); // Reset starting cards to default
+  };
+
+  const calculateTotalScore = (playerIndex) => {
+    return scores[playerIndex].reduce((total, score) => total + (score || 0), 0);
+  };
+
+  // --- Render Method ---
+
+  return (
+    <div className="bg-gray-900 text-white min-h-screen font-sans p-4 sm:p-6 lg:p-8">
+      <div className="max-w-7xl mx-auto">
+        <header className="text-center mb-8">
+          <h1 className="text-4xl sm:text-5xl font-bold text-cyan-400 tracking-wider">O'Hell Scorer</h1>
+          <p className="text-gray-400 mt-2">Track bids and scores with ease.</p>
+        </header>
+
+        {/* Player & Game Setup */}
+        <div className="bg-gray-800 p-6 rounded-2xl shadow-lg mb-8">
+          <h2 className="text-2xl font-semibold mb-4 text-gray-200 border-b-2 border-gray-700 pb-2">Game Setup</h2>
+          
+          {/* Game Settings */}
+          <div className="mb-6">
+            <label htmlFor="starting-cards" className="block text-lg font-medium text-gray-300 mb-2">
+              Starting Number of Cards (Sets):
+            </label>
+            <select
+              id="starting-cards"
+              value={startingCards}
+              onChange={(e) => setStartingCards(parseInt(e.target.value, 10))}
+              disabled={isSetupLocked}
+              className="w-full max-w-xs bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-cyan-500 transition disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {/* Generate options from 8 to 15 */}
+              {Array.from({ length: 8 }, (_, i) => i + 8).map(num => (
+                <option key={num} value={num}>{num}</option>
+              ))}
+            </select>
+            {isSetupLocked && <p className="text-sm text-gray-500 mt-2">Game settings are locked after the first round begins.</p>}
+          </div>
+
+          {/* Player Names */}
+          <h3 className="text-xl font-semibold mb-4 text-gray-200">Players</h3>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+            {players.map((name, index) => (
+              <div key={index}>
+                <label className="block text-sm font-medium text-gray-400 mb-1" htmlFor={`player-${index}`}>
+                  Player {index + 1}
+                </label>
+                <input
+                  id={`player-${index}`}
+                  type="text"
+                  value={name}
+                  onChange={(e) => handlePlayerNameChange(index, e.target.value)}
+                  placeholder={`Player ${index + 1}`}
+                  disabled={isSetupLocked}
+                  className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-cyan-500 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Game Area */}
+        {!isGameOver ? (
+          <div className="bg-gray-800 p-6 rounded-2xl shadow-lg mb-8">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-2xl font-semibold text-gray-200">
+                Round {currentRound} <span className="text-gray-400 text-lg">({cardsInRound} Cards)</span>
+              </h2>
+              <button
+                onClick={handleNextRound}
+                className="bg-cyan-600 hover:bg-cyan-500 text-white font-bold py-2 px-4 rounded-lg shadow-md transition-transform transform hover:scale-105"
+              >
+                {currentRound === totalRounds ? 'Finish Game' : 'Next Round'}
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {players.map((player, index) => (
+                player && (
+                  <div key={index} className="bg-gray-700 p-4 rounded-xl">
+                    <h3 className="text-xl font-bold text-cyan-300 truncate">{player}</h3>
+                    <div className="flex items-center gap-4 mt-3">
+                      <label htmlFor={`bid-${index}`} className="font-medium text-gray-300">Bid:</label>
+                      <input
+                        id={`bid-${index}`}
+                        type="number"
+                        min="0"
+                        max={cardsInRound}
+                        value={bids[index]}
+                        onChange={(e) => handleBidChange(index, e.target.value)}
+                        className="w-20 bg-gray-800 border border-gray-600 rounded-lg px-3 py-1 text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                      />
+                    </div>
+                    <div className="mt-4">
+                      <p className="font-medium text-gray-300 mb-2">Did they make it?</p>
+                      <div className="flex gap-3">
+                        <button
+                          onClick={() => recordRoundResult(index, true)}
+                          className="flex-1 bg-green-600 hover:bg-green-500 text-white font-semibold py-2 px-4 rounded-lg flex items-center justify-center gap-2 transition-transform transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+                          disabled={scores[index][currentRound - 1] !== undefined}
+                        >
+                          <CheckIcon /> Yes
+                        </button>
+                        <button
+                          onClick={() => recordRoundResult(index, false)}
+                          className="flex-1 bg-red-600 hover:red-green-500 text-white font-semibold py-2 px-4 rounded-lg flex items-center justify-center gap-2 transition-transform transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+                          disabled={scores[index][currentRound - 1] !== undefined}
+                        >
+                          <XIcon /> No
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div className="bg-gray-800 p-8 rounded-2xl shadow-lg text-center">
+            <h2 className="text-4xl font-bold text-cyan-400 mb-4">Game Over!</h2>
+            <p className="text-gray-300 mb-6">Here are the final scores.</p>
+            <button
+              onClick={handleNewGame}
+              className="bg-cyan-600 hover:bg-cyan-500 text-white font-bold py-3 px-6 rounded-lg shadow-md transition-transform transform hover:scale-105 text-lg"
+            >
+              Start New Game
+            </button>
+          </div>
+        )}
+
+        {/* Scoreboard */}
+        <div className="bg-gray-800 p-6 rounded-2xl shadow-lg overflow-x-auto">
+          <h2 className="text-2xl font-semibold mb-4 text-gray-200 border-b-2 border-gray-700 pb-2">Scoreboard</h2>
+          <table className="w-full min-w-max text-left">
+            <thead>
+              <tr className="border-b border-gray-600">
+                <th className="p-3 font-semibold text-gray-300 sticky left-0 bg-gray-800">Player</th>
+                {roundsSequence.map((cards, index) => (
+                  <th key={index} className={`p-3 text-center font-semibold text-gray-400 ${index + 1 === currentRound && !isGameOver ? 'bg-cyan-800 rounded-t-lg' : ''}`}>
+                    R{index + 1} <span className="text-xs">({cards})</span>
+                  </th>
+                ))}
+                <th className="p-3 text-right font-semibold text-cyan-300 text-lg sticky right-0 bg-gray-800">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {players.map((player, pIndex) => (
+                player && (
+                  <tr key={pIndex} className="border-b border-gray-700 last:border-b-0">
+                    <td className="p-3 font-bold text-lg truncate sticky left-0 bg-gray-800" style={{maxWidth: '150px'}}>{player}</td>
+                    {roundsSequence.map((_, rIndex) => (
+                      <td key={rIndex} className={`p-3 text-center ${rIndex + 1 === currentRound && !isGameOver ? 'bg-cyan-900 bg-opacity-50' : ''}`}>
+                        {scores[pIndex][rIndex] !== undefined ? scores[pIndex][rIndex] : '-'}
+                      </td>
+                    ))}
+                    <td className="p-3 text-right font-bold text-cyan-300 text-xl sticky right-0 bg-gray-800">
+                      {calculateTotalScore(pIndex)}
+                    </td>
+                  </tr>
+                )
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default App;
