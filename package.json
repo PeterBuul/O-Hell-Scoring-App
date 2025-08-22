@@ -1,6 +1,12 @@
 {
   "name": "ohell-scorer",
   "version": "0.1.0",
+  {
+  "name": "ohell-scorer",
+  "version": "0.1.0",
+  "homepage": "https://peterbuul.github.io/O-Hell-Scoring-App",
+  "private": true,
+  "dependencies": {
   "private": true,
   "dependencies": {
     "react": "^18.3.1",
